@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contagem Física de Estoque</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--tx:#1f2937;--mut:#6b7280;--bd:#dfe3ea;--pri:#1d4ed8;--pri2:#e8efff;
+--ok:#15803d;--okbg:#dcfce7;--bad:#b91c1c;--badbg:#fee2e2;--warn:#b45309;--warnbg:#fef3c7}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+header{background:#fff;border-bottom:1px solid var(--bd);padding:10px 16px;position:sticky;top:0;z-index:30}
+h1{font-size:18px;margin:0 0 8px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,.btn{font:inherit;border:1px solid var(--bd);background:#fff;border-radius:8px;padding:7px 12px;cursor:pointer;color:var(--tx)}
+button:hover,.btn:hover{background:#f1f5f9}
+.pri{background:var(--pri);border-color:var(--pri);color:#fff}.pri:hover{background:#1e40af}
+.dng{color:var(--bad);border-color:#fca5a5}.dng:hover{background:var(--badbg)}
+.dirty{background:var(--warnbg)!important;border-color:#f59e0b!important;color:var(--warn)}
+.menu{position:relative;display:inline-block}
+.menu .dd{display:none;position:absolute;top:100%;left:0;background:#fff;border:1px solid var(--bd);border-radius:8px;box-shadow:0 6px 20px #0002;min-width:300px;z-index:40;margin-top:4px}
+.menu.open .dd{display:block}
+.dd button{display:block;width:100%;text-align:left;border:0;border-radius:0;padding:9px 12px}
+main{padding:12px 16px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 12px}
+.card small{color:var(--mut);display:block}.card b{font-size:18px}
+.prog{height:6px;background:#e5e7eb;border-radius:4px;margin-top:6px;overflow:hidden}.prog i{display:block;height:100%;background:var(--pri)}
+.pos{color:var(--ok)}.neg{color:var(--bad)}
+.filters{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+.filters label{display:flex;flex-direction:column;font-size:12px;color:var(--mut);gap:3px}
+.filters label.row{flex-direction:row;align-items:center;gap:6px;color:var(--tx);font-size:13px;padding-bottom:7px}
+input[type=text],input[type=search],select,input[type=number]{font:inherit;border:1px solid var(--bd);border-radius:7px;padding:6px 8px;background:#fff;min-width:0}
+.tw{background:var(--card);border:1px solid var(--bd);border-radius:10px;overflow:auto;max-height:calc(100vh - 310px);min-height:300px}
+table{border-collapse:collapse;width:100%}
+th{position:sticky;top:0;background:#eef2f7;text-align:left;padding:8px;border-bottom:1px solid var(--bd);cursor:pointer;white-space:nowrap;user-select:none;z-index:5}
+th.n,td.n{text-align:right}th.c,td.c{text-align:center}
+td{padding:5px 8px;border-bottom:1px solid #eef0f4;vertical-align:middle}
+tr.gh td{background:#e2e8f0;font-weight:700;position:sticky;top:34px;z-index:4}
+tr.pos td{background:var(--okbg)}tr.neg td{background:var(--badbg)}
+tr.done td.pn{font-weight:600}
+tr.ex td{opacity:.5;text-decoration:line-through}
+td.pn{min-width:460px}
+td.n{white-space:nowrap}
+td.pn input.ed{font-size:14px}
+td.code{color:var(--mut);font-family:ui-monospace,Consolas,monospace;font-size:12px}
+td input.cnt{width:96px;text-align:right}
+td input.ed{width:100%;border-color:transparent;background:transparent}
+td input.ed:hover,td input.ed:focus{border-color:var(--bd);background:#fff}
+td input.erp,td input.pr{width:92px;text-align:right}
+td input.erp{border-color:#cbd5e1;background:#fff}
+.un{color:var(--mut);font-size:11px;margin-left:3px}
+.cx{font-size:11px;border-radius:4px;padding:2px 6px;background:var(--warnbg);color:var(--warn);white-space:nowrap}
+.cx.d{background:#ede9fe;color:#5b21b6}
+.cx.ok{background:#e5e7eb;color:#4b5563}
+#chkAll{width:16px;height:16px;vertical-align:middle;cursor:pointer}
+.modal ul{margin:6px 0;padding-left:18px}.modal .sum{border:1px solid var(--bd);border-radius:8px;padding:8px 10px;margin:8px 0;font-size:13px}
+.mini{padding:3px 7px;font-size:12px}
+.dpos{color:var(--ok);font-weight:700}.dneg{color:var(--bad);font-weight:700}
+.tag{font-size:11px;background:var(--warnbg);color:var(--warn);border-radius:4px;padding:1px 5px;margin-left:4px}
+.empty{padding:40px;text-align:center;color:var(--mut)}
+.mask{position:fixed;inset:0;background:#0006;z-index:60;display:none;align-items:center;justify-content:center;padding:16px}
+.mask.on{display:flex}
+.modal{background:#fff;border-radius:12px;padding:18px;max-width:520px;width:100%;max-height:90vh;overflow:auto}
+.modal h3{margin:0 0 8px}.modal .acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
+.modal .fld{display:flex;flex-direction:column;gap:3px;margin:8px 0;font-size:12px;color:var(--mut)}
+.modal .fld input{font-size:14px;color:var(--tx)}
+#calc{position:fixed;right:16px;bottom:16px;width:290px;background:#fff;border:1px solid var(--bd);border-radius:12px;box-shadow:0 10px 30px #0003;z-index:50;display:none}
+#calc.on{display:block}
+#calc .hd{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#eef2f7;border-radius:12px 12px 0 0;font-weight:600}
+#cexp{width:100%;font-size:15px;padding:8px;text-align:right;border:0;border-bottom:1px solid var(--bd);outline:0}
+#cres{text-align:right;font-size:26px;font-weight:700;padding:4px 10px;min-height:42px}
+#ckeys{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;padding:8px}
+#ckeys button{padding:10px 0;font-size:16px}
+#chist{max-height:130px;overflow:auto;border-top:1px solid var(--bd);font-size:12px}
+#chist div{padding:4px 10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+#chist div:hover{background:#f1f5f9}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:#111827;color:#fff;padding:9px 16px;border-radius:8px;z-index:90;display:none}
+.hint{color:var(--mut);font-size:12px}
+@media print{header,.filters,#calc{display:none}}
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 Contagem Física de Estoque <span class="hint" id="saved"></span></h1>
+  <div class="bar">
+    <label class="btn pri" title="Aceita o PDF por grupo e/ou o PDF alfabético (com custos), juntos ou separados. O tipo é reconhecido automaticamente.">📥 Importar PDF(s) do ERP<input type="file" id="fP" accept="application/pdf" multiple hidden></label>
+    <button id="bAdd">➕ Adicionar produto</button>
+    <button id="bCalc">🧮 Calculadora</button>
+    <div class="menu" id="mX"><button>📊 Exportar Excel ▾</button><div class="dd">
+      <button data-x="xlsx-f">Como está filtrado</button><button data-x="xlsx-a">Completo</button></div></div>
+    <div class="menu" id="mP"><button>📕 Exportar PDF ▾</button><div class="dd">
+      <button data-x="pdf-f">Como está filtrado — todas as colunas</button><button data-x="pdf-fq">Como está filtrado — só quantidades</button><button data-x="pdf-a">Completo — todas as colunas</button><button data-x="pdf-aq">Completo — só quantidades</button></div></div>
+    <div class="menu" id="mB"><button>💾 Backup ▾</button><div class="dd">
+      <button data-x="bk-out">Baixar backup (.json)</button><button data-x="bk-in">Restaurar backup…</button></div></div>
+    <input type="file" id="fB" accept=".json" hidden>
+    <button class="dng" id="bClear">🗑 Limpar tudo</button>
+    <span class="hint">Tudo é salvo automaticamente neste navegador.</span>
+  </div>
+</header>
+<main>
+  <div class="cards" id="cards"></div>
+  <div class="hint" id="repinfo" style="margin:-4px 0 10px"></div>
+  <div class="filters">
+    <label style="flex:1 1 320px">🔎 Pesquisar produto (qualquer parte do nome ou código)<input type="search" id="q" placeholder="Ex.: calabresa, 5kg, rezende…" style="width:100%;font-size:16px;padding:9px 10px" autocomplete="off"></label>
+    <label>Grupo<select id="fGrp"></select></label>
+    <label>Conferência<select id="fSt"><option value="">Todos</option><option value="done">Já conferidos</option><option value="todo">Falta contar</option></select></label>
+    <label>Divergência<select id="fDv"><option value="">Todas</option><option value="any">Só com divergência</option><option value="pos">Só positivas (sobra)</option><option value="neg">Só negativas (falta)</option><option value="zero">Sem divergência</option></select></label>
+    <label>Cruzamento dos PDFs<select id="fCx"><option value="">Todos</option><option value="any">Com inconsistência</option><option value="only-g">Só no PDF por grupo</option><option value="only-c">Só no PDF alfabético</option><option value="diff">Saldo diferente entre os PDFs</option><option value="res">Já resolvidas</option></select></label>
+    <label class="row"><input type="checkbox" id="fNeg"> Saldo ERP negativo</label>
+    <label class="row"><input type="checkbox" id="fEx"> Ver excluídos</label>
+    <button id="bRe">↻ Reaplicar filtros</button>
+    <button id="bFc">Limpar filtros</button>
+    <button id="bRep" title="Para os produtos visíveis que ainda não foram conferidos, copia o saldo do ERP">= Repetir ERP nos visíveis não conferidos</button>
+    <button id="bGx" class="dng" style="display:none"></button>
+    <button id="bXv" class="dng" title="Exclui do espelho todos os produtos que estão aparecendo agora (respeita a pesquisa e os filtros)">✕ Excluir visíveis</button>
+  </div>
+  <div class="tw"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+</main>
+<div id="calc">
+  <div class="hd"><span>🧮 Calculadora</span><span><button class="mini" id="cClr">Limpar histórico</button> <button class="mini" id="cX">✕</button></span></div>
+  <input id="cexp" type="text" placeholder="0" autocomplete="off">
+  <div id="cres">0</div>
+  <div style="padding:0 8px"><button class="mini" id="cIns" style="width:100%">⬇ Inserir resultado no produto em foco</button></div>
+  <div id="ckeys"></div>
+  <div id="chist"></div>
+</div>
+<div class="mask" id="mask"><div class="modal" id="modal"></div></div>
+<div id="toast"></div>
+<script>
+/* ===================== LÓGICA (sem DOM) ===================== */
+const LS_KEY = 'contagem_estoque_v1';
+const TOL = 0.0051; // o relatório de custos arredonda o saldo em 2 casas
+const NEWS = () => ({ items: [], calc: [], seq: 1, has: { g: false, c: false }, zero: { g: {}, c: {} }, rep: {}, removed: {}, exGroups: {} });
+let S = NEWS();
+function normState(o) { const n = Object.assign(NEWS(), o || {}); n.has = Object.assign({ g: false, c: false }, n.has); n.zero = n.zero || {}; n.zero.g = n.zero.g || {}; n.zero.c = n.zero.c || {}; n.rep = n.rep || {}; n.removed = n.removed || {}; n.exGroups = n.exGroups || {}; return n; }
+function load() {
+  try { const r = localStorage.getItem(LS_KEY); if (r) { const o = JSON.parse(r); if (o && Array.isArray(o.items)) S = normState(o); } } catch (e) {}
+}
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); return true; } catch (e) { return false; }
+}
+const nf = new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 });
+const mf = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+const fq = v => (v == null || isNaN(v)) ? '' : nf.format(v);
+const fm = v => (v == null || isNaN(v)) ? '' : mf.format(v);
+const norm = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+const keyOf = it => it.code ? 'C:' + String(it.code).replace(/^0+/, '') : 'N:' + norm(it.name);
+
+// número no padrão brasileiro: 1.234,56 | -12,00 | 12,00- | (12,00) | 1234.5
+const NUM_RE = /^[-+]?\(?\d{1,3}(?:\.\d{3})+(?:,\d+)?\)?-?$|^[-+]?\(?\d+(?:,\d+)?\)?-?$|^[-+]?\d+\.\d{1,3}-?$/;
+function isNum(t) { return NUM_RE.test(t); }
+function parseBR(t) {
+  if (t == null) return NaN;
+  let s = String(t).trim(); if (!s) return NaN;
+  let neg = false;
+  if (/^\(.*\)$/.test(s)) { neg = true; s = s.slice(1, -1); }
+  if (s.endsWith('-')) { neg = true; s = s.slice(0, -1); }
+  if (s.startsWith('-')) { neg = true; s = s.slice(1); }
+  if (s.startsWith('+')) s = s.slice(1);
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  else if ((s.match(/\./g) || []).length > 1) s = s.replace(/\./g, '');
+  const v = parseFloat(s); if (isNaN(v)) return NaN;
+  return neg ? -v : v;
+}
+const UNITS = /^(UN|UND|UNID|CX|CXA|PCT|PC|PCS|KG|KGS|G|L|LT|FD|FARD|SC|DP|DZ|PT|BD|BDJ|MT|M|ML|PÇ|CJ|RL)\.?$/i;
+const SKIP = /^(total|totais|subtotal|p[aá]gina|pag\b|pag\.|emiss[aã]o|relat[oó]rio|empresa|cnpj|saldo|quantidade|c[oó]digo|descri[cç][aã]o|produto|valor|pre[cç]o|data|hora|filtro|per[ií]odo|estoque|posi[cç][aã]o|usu[aá]rio|fim do|continua)/i;
+
+// separa código da descrição
+function splitCode(raw) {
+  let s = raw.trim(), code = '';
+  let m;
+  if ((m = s.match(/\((?:c[oó]d(?:igo)?\.?:?\s*)(\w+)\)/i))) { code = m[1]; s = s.replace(m[0], ' '); }
+  else if ((m = s.match(/^(\d{2,})\s*[-–:.]?\s+(\S.*)$/))) { code = m[1]; s = m[2]; }
+  else if ((m = s.match(/^(.*\S)\s+[-–]\s*(\d{3,})$/))) { code = m[2]; s = m[1]; }
+  else if ((m = s.match(/^([A-Za-z]{0,3}\d{3,}[A-Za-z]?)\s+(\S.*)$/))) { code = m[1]; s = m[2]; }
+  s = s.replace(/\s+/g, ' ').replace(/^[-–:.\s]+|[-–:.\s]+$/g, '').trim();
+  return { code, name: s };
+}
+
+/* ---------- leitura estruturada dos relatórios do ERP (AlphaSis) ---------- */
+// junta itens de texto colados; cada "célula" é uma coluna do relatório
+function mergeCells(its) {
+  const out = [];
+  for (const it of its) {
+    const last = out[out.length - 1];
+    const gap = last ? it.x - (last.x + last.w) : 999;
+    if (last && gap < 2 && !isNum(last.s.trim()) && !isNum(it.s.trim())) {
+      last.s += (gap > 0.8 ? ' ' : '') + it.s; last.w = it.x + it.w - last.x;
+    } else out.push({ s: it.s, x: it.x, w: it.w });
+  }
+  return out.map(c => ({ s: c.s.trim(), x: c.x, w: c.w }));
+}
+// itens de UMA página -> linhas (de cima para baixo), cada linha = células ordenadas por x
+function buildRows(items) {
+  const its = items.filter(i => i.s && i.s.trim() !== '').sort((a, b) => b.y - a.y || a.x - b.x);
+  const rows = [];
+  for (const it of its) {
+    const r = rows[rows.length - 1];
+    if (r && Math.abs(r.y - it.y) <= 2.5) r.a.push(it); else rows.push({ y: it.y, a: [it] });
+  }
+  return rows.map(r => mergeCells(r.a.sort((a, b) => a.x - b.x)));
+}
+const CODE_RE = /^(\w*\d\w*)\s*-\s+(.+)$/;
+const GRP_RES = [/^C[oó]digo:\s*\d*\s*C[oó]digo:\s*(.*)$/i, /^(?:grupo|categoria|se[cç][aã]o|departamento)\s*:\s*(.*)$/i];
+function groupOf(text) { for (const re of GRP_RES) { const m = text.match(re); if (m) return m[1].trim(); } return null; }
+
+// tipo 'g' = posição do estoque por grupo (Produto, Marca, Saldo, Und)
+// tipo 'c' = custo de produtos (Produto, Saldo, Preço custo, Total, Total c/Neg)
+function parseRows(rows) {
+  let type = null, group = '', pdfTotal = null, stamp = '', rowsRead = 0;
+  const items = [], seen = new Set(), groups = new Set();
+  for (const cells of rows) {
+    const text = cells.map(c => c.s).join(' ').replace(/\s+/g, ' ').trim(); if (!text) continue;
+    let m;
+    if (!type) { if (/pre[cç]o\s*custo|custo de produtos/i.test(text)) type = 'c'; else if (/posi[cç][aã]o do estoque/i.test(text) || (/\bMarca\b/.test(text) && /Saldo/i.test(text))) type = 'g'; }
+    if (!stamp && (m = text.match(/Data\/Hora:\s*(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}(?::\d{2})?)/i))) stamp = m[1];
+    if ((m = text.match(/^Total listado:\s*(\d+)/i))) { pdfTotal = +m[1]; continue; }
+    const g = groupOf(text); if (g !== null) { group = g; if (g) groups.add(g); continue; }
+    const cm = cells[0] && cells[0].s.match(CODE_RE); if (!cm) continue;
+    const nums = cells.slice(1).filter(c => isNum(c.s)); if (!nums.length) continue;
+    const qty = parseBR(nums[0].s); if (isNaN(qty)) continue;
+    let price = null, unit = '';
+    if (type === 'c' || nums.length >= 3) { const p = parseBR(nums[1] && nums[1].s); price = (!isNaN(p) && p > 0) ? p : null; }
+    else { const i = cells.indexOf(nums[0]); const u = cells[i + 1]; if (u && !isNum(u.s) && u.s.length <= 5) unit = u.s.toUpperCase(); }
+    rowsRead++;
+    const code = cm[1], name = cm[2].replace(/\s+/g, ' ').trim();
+    const k = code.replace(/^0+/, '') || '0'; if (seen.has(k)) continue; seen.add(k);
+    items.push({ code, name, group, erp: qty, price, unit });
+  }
+  return { type: type || 'x', items, groups: [...groups], pdfTotal, stamp, rowsRead };
+}
+
+/* ---------- leitor genérico (reserva, para PDFs de outro formato) ---------- */
+function parseLines(lines) {
+  const out = []; let group = ''; const seen = new Set(), groups = new Set();
+  for (const L of lines) {
+    const text = L.text.replace(/\s+/g, ' ').trim(); if (!text) continue;
+    const toks = text.split(' '); let nums = [], i = toks.length;
+    while (i > 0 && isNum(toks[i - 1])) { nums.unshift(toks[i - 1]); i--; }
+    let namePart = toks.slice(0, i);
+    if (nums.length && namePart.length > 1 && UNITS.test(namePart[namePart.length - 1])) namePart = namePart.slice(0, -1);
+    const name = namePart.join(' ');
+    if (!nums.length) { const g = groupOf(text); if (g !== null) { group = g; if (g) groups.add(g); } continue; }
+    if (!name || SKIP.test(name)) continue;
+    const v = nums.map(parseBR); let qty = v[0], price = null;
+    if (v.length === 2) price = v[1];
+    else if (v.length >= 3) { const a = v[v.length - 3], b = v[v.length - 2], c = v[v.length - 1]; if (Math.abs(a * b - c) <= Math.max(0.05, Math.abs(c) * 0.02)) { qty = a; price = b; } else if (Math.abs(b * c - a) <= Math.max(0.05, Math.abs(a) * 0.02)) { qty = b; price = c; } else { qty = a; price = b; } }
+    if (isNaN(qty)) continue;
+    const sp = splitCode(name); if (!sp.name) continue;
+    const it = { code: sp.code, name: sp.name, group, erp: qty, price: (price != null && !isNaN(price) && price > 0) ? price : null, unit: '' };
+    const k = keyOf(it); if (seen.has(k)) continue; seen.add(k); out.push(it);
+  }
+  return { type: 'x', items: out, groups: [...groups], pdfTotal: null, stamp: '', rowsRead: out.length };
+}
+const parseAny = rows => { let r = parseRows(rows); if (!r.items.length) r = parseLines(rows.map(c => ({ text: c.map(x => x.s).join(' ') }))); return r; };
+
+/* ---------- aplicar relatório ao espelho ---------- */
+function bestErp(it, src, q) { return (src === 'c' && it.sg != null && Math.abs(it.sg - q) <= TOL) ? it.sg : q; }
+const isProtected = it => it.count != null || !!it.erpEdited;
+// quantos itens do relatório já existem e estão protegidos (conferidos ou com saldo editado)
+function countProtected(rep) {
+  const idx = new Map(S.items.map(it => [keyOf(it), it]));
+  let n = 0; for (const x of rep.items) { const c = idx.get(keyOf(x)); if (c && isProtected(c)) n++; } return n;
+}
+function applyReport(rep, mode) {
+  const src = rep.type === 'g' || rep.type === 'c' ? rep.type : null;
+  const idx = new Map(S.items.map(it => [keyOf(it), it]));
+  const st = { read: rep.items.length, added: 0, updated: 0, kept: 0, zeroIgnored: 0, removed: 0, hiddenNew: 0 };
+  for (const n of rep.items) {
+    const k = keyOf(n), cur = idx.get(k);
+    if (!cur) {
+      if (S.removed[k]) { st.removed++; continue; }
+      if (n.erp === 0) { st.zeroIgnored++; if (src) S.zero[src][k] = 1; continue; }
+      const it = { id: S.seq++, code: n.code, name: n.name, group: n.group || '', unit: n.unit || '', erp: n.erp, price: n.price, count: null, ex: !!S.exGroups[n.group || '(Sem grupo)'], manual: false, sg: src === 'g' ? n.erp : null, sc: src === 'c' ? n.erp : null };
+      S.items.push(it); idx.set(k, it); st.added++; if (it.ex) st.hiddenNew++; continue;
+    }
+    if (src) { delete S.zero[src][k]; if (src === 'g') cur.sg = n.erp; else cur.sc = n.erp; }
+    if (!cur.group && n.group) cur.group = n.group; if (!cur.code && n.code) cur.code = n.code; if (!cur.unit && n.unit) cur.unit = n.unit;
+    if (mode === 'uncounted' && isProtected(cur)) { st.kept++; if (cur.price == null && n.price != null) cur.price = n.price; }
+    else { cur.erp = bestErp(cur, src, n.erp); cur.erpEdited = false; if (n.price != null) cur.price = n.price; st.updated++; }
+  }
+  if (src) { S.has[src] = true; }
+  return st;
+}
+// cruzamento entre os dois relatórios
+function crossRaw(it) {
+  if (it.manual || !(S.has.g && S.has.c)) return null;
+  const k = keyOf(it);
+  const gq = it.sg != null ? it.sg : (S.zero.g[k] ? 0 : null);
+  const cq = it.sc != null ? it.sc : (S.zero.c[k] ? 0 : null);
+  if (gq == null && cq == null) return null;
+  if (gq == null) return { t: 'only-c', gq, cq };
+  if (cq == null) return { t: 'only-g', gq, cq };
+  if (Math.abs(gq - cq) > TOL) return { t: 'diff', gq, cq };
+  return null;
+}
+const sigOf = c => ({ t: c.t, gq: c.gq, cq: c.cq });
+const sameSig = (a, c) => !!a && a.t === c.t && (c.t !== 'diff' || (Math.abs((a.gq || 0) - (c.gq || 0)) <= TOL && Math.abs((a.cq || 0) - (c.cq || 0)) <= TOL));
+// pendente = inconsistência que ainda não foi resolvida (ou que mudou desde que foi resolvida)
+function crossInfo(it) { const c = crossRaw(it); return (c && !sameSig(it.ack, c)) ? c : null; }
+function crossResolved(it) { const c = crossRaw(it); return (c && sameSig(it.ack, c)) ? c : null; }
+// produto conferido ou excluído = inconsistência resolvida (guarda a "assinatura" dela)
+function autoAck() { let n = 0; for (const it of S.items) { if (!it.ack && !it.noAuto && (it.count != null || it.ex)) { const c = crossRaw(it); if (c) { it.ack = sigOf(c); n++; } } } return n; }
+function crossDesc(c) {
+  if (c.t === 'only-g') return 'Só no relatório por grupo';
+  if (c.t === 'only-c') return 'Só no relatório de custos';
+  return 'Saldo diverge: grupo ' + fq(c.gq) + ' × custos ' + fq(c.cq);
+}
+function crossText(it) { const c = crossInfo(it); if (c) return crossDesc(c); const r = crossResolved(it); return r ? 'Resolvida: ' + crossDesc(r) : ''; }
+
+const diffOf = it => it.count == null ? null : +(it.count - (it.erp || 0)).toFixed(6);
+const impactOf = it => { const d = diffOf(it); return (d == null || it.price == null) ? null : +(d * it.price).toFixed(4); };
+
+// calculadora segura
+function evalExpr(s) {
+  s = s.replace(/−/g, '-').replace(/×/g, '*').replace(/÷/g, '/').replace(/\s+/g, '');
+  if (!s) return NaN;
+  s = s.replace(/(\d+(?:[.,]\d+)?)%/g, '($1/100)');
+  s = s.replace(/,/g, '.');
+  if (!/^[0-9+\-*/().]+$/.test(s)) return NaN;
+  try { const r = Function('"use strict";return (' + s + ')')(); return (typeof r === 'number' && isFinite(r)) ? r : NaN; } catch (e) { return NaN; }
+}
+
+/* ===================== INTERFACE ===================== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const V = { col: null, dir: 1, focusId: null };
+const COLS = [
+  ['done', '<input type="checkbox" id="chkAll" title="Marcar todos os produtos visíveis como conferidos (repete o saldo do ERP) / desmarcar"> ✔', 'c'], ['code', 'Código', ''], ['name', 'Produto', ''], ['group', 'Grupo', ''],
+  ['erp', 'Qtd no ERP', 'n'], ['price', 'Valor unit.', 'n'], ['count', 'Qtd conferência', 'n'],
+  ['diff', 'Diferença', 'n'], ['impact', 'Impacto (R$)', 'n'], ['cross', 'Cruzamento PDFs', ''], ['act', '', 'c']
+];
+function toast(m, ms = 2600) { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', ms); }
+function persist() { autoAck(); const ok = save(); $('saved').textContent = ok ? '· salvo ' + new Date().toLocaleTimeString('pt-BR') : '· ⚠ não foi possível salvar'; }
+function modal(html, btns) {
+  return new Promise(res => {
+    $('modal').innerHTML = html + '<div class="acts">' + btns.map((b, i) => `<button data-i="${i}" class="${b.cls || ''}">${b.t}</button>`).join('') + '</div>';
+    $('mask').classList.add('on');
+    const done = v => { $('mask').classList.remove('on'); res(v); };
+    $('modal').querySelectorAll('.acts button').forEach(b => b.onclick = () => { const x = btns[+b.dataset.i]; done(x.v === 'FORM' ? readForm() : x.v); });
+    function readForm() { const o = {}; $('modal').querySelectorAll('input[data-k]').forEach(i => o[i.dataset.k] = i.value); return o; }
+  });
+}
+const num2str = v => v == null ? '' : String(v).replace('.', ',');
+
+/* ---------- filtros / ordenação ---------- */
+function filters() {
+  return { q: norm($('q').value), g: $('fGrp').value, st: $('fSt').value, dv: $('fDv').value, cx: $('fCx').value, neg: $('fNeg').checked, ex: $('fEx').checked };
+}
+function filtersActive() { const f = filters(); return !!(f.q || f.g || f.st || f.dv || f.cx || f.neg || f.ex); }
+function passes(it, f) {
+  if (f.ex ? !it.ex : it.ex) return false;
+  if (f.g && (it.group || '(Sem grupo)') !== f.g) return false;
+  if (f.q) { const hay = norm(it.name) + ' ' + String(it.code).toUpperCase(); if (!f.q.split(' ').every(t => hay.includes(t))) return false; }
+  if (f.st === 'done' && it.count == null) return false;
+  if (f.st === 'todo' && it.count != null) return false;
+  if (f.neg && !(it.erp < 0)) return false;
+  if (f.cx === 'res') { if (!crossResolved(it)) return false; } else if (f.cx) { const c = crossInfo(it); if (!c) return false; if (f.cx === 'any') { /* qualquer */ } else if (f.cx === 'only-g' ? c.t !== 'only-g' : f.cx === 'only-c' ? c.t !== 'only-c' : c.t !== 'diff') return false; }
+  const d = diffOf(it);
+  if (f.dv === 'any' && !(d != null && d !== 0)) return false;
+  if (f.dv === 'pos' && !(d != null && d > 0)) return false;
+  if (f.dv === 'neg' && !(d != null && d < 0)) return false;
+  if (f.dv === 'zero' && !(d != null && d === 0)) return false;
+  return true;
+}
+function sortVal(it, c) {
+  switch (c) {
+    case 'done': return it.count != null ? 1 : 0; case 'code': return String(it.code || ''); case 'name': return it.name || '';
+    case 'group': return it.group || ''; case 'erp': return it.erp; case 'price': return it.price; case 'count': return it.count;
+    case 'diff': return diffOf(it); case 'impact': return impactOf(it); case 'cross': return crossText(it) || null;
+  }
+}
+const coll = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+function getView(all) {
+  const f = filters();
+  let v = S.items.filter(it => all ? !it.ex : passes(it, f));
+  if (V.col) {
+    const c = V.col, d = V.dir;
+    v = v.slice().sort((a, b) => {
+      const x = sortVal(a, c), y = sortVal(b, c);
+      if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+      return (typeof x === 'string' ? coll.compare(x, y) : x - y) * d;
+    });
+  }
+  return v;
+}
+
+/* ---------- renderização ---------- */
+function rowClass(it) { const d = diffOf(it); return (it.ex ? 'ex ' : '') + (it.count != null ? 'done ' : '') + (d > 0 ? 'pos' : d < 0 ? 'neg' : ''); }
+function dCell(it) { const d = diffOf(it); return d == null ? '' : `<span class="${d > 0 ? 'dpos' : d < 0 ? 'dneg' : ''}">${d > 0 ? '+' : ''}${fq(d)}</span>`; }
+function crossBadge(it) {
+  const c = crossInfo(it);
+  if (c) return `<span class="cx ${c.t === 'diff' ? 'd' : ''}" title="${esc(crossText(it))}">${c.t === 'only-g' ? '⚠ só no PDF por grupo' : c.t === 'only-c' ? '⚠ só no PDF alfabético' : '⚠ ' + esc(crossText(it))}</span> <button class="mini b-ack" title="Marcar como resolvida (não volta em novas importações)">✓</button>`;
+  const r = crossResolved(it);
+  return r ? `<span class="cx ok" title="${esc(crossDesc(r))}">✔ resolvida</span> <button class="mini b-unack" title="Reabrir esta inconsistência">↩</button>` : '';
+}
+function rowHTML(it) {
+  return `<tr data-id="${it.id}" class="${rowClass(it)}">
+<td class="c"><input type="checkbox" class="chk" ${it.count != null ? 'checked' : ''} title="Marca como conferido (repete o saldo do ERP)"></td>
+<td class="code"><input class="ed f-code" value="${esc(it.code)}" style="width:80px"></td>
+<td class="pn"><input class="ed f-name" value="${esc(it.name)}">${it.manual ? '<span class="tag">manual</span>' : ''}${it.erp < 0 ? '<span class="tag">ERP negativo</span>' : ''}</td>
+<td>${esc(it.group || '')}</td>
+<td class="n"><input class="ed erp f-erp" value="${num2str(it.erp)}" inputmode="decimal" title="Clique para editar o saldo do ERP">${it.unit ? `<span class="un">${esc(it.unit)}</span>` : ''}</td>
+<td class="n"><input class="ed pr f-pr" value="${num2str(it.price)}" inputmode="decimal" placeholder="—"></td>
+<td class="n"><input type="text" class="cnt f-cnt" value="${num2str(it.count)}" inputmode="decimal" placeholder="contar…"${it.cv ? ` title="Última conversão: ${esc(num2str(it.cv.c))} cx × ${esc(num2str(it.cv.f))}${it.cv.s ? ' + ' + esc(num2str(it.cv.s)) : ''}"` : ''}> <button class="mini b-eq" title="Repetir saldo do ERP">=</button> <button class="mini b-cv" title="Converter caixas em unidades">📦</button></td>
+<td class="n dcell">${dCell(it)}</td><td class="n icell">${it.count != null && it.price != null ? fm(impactOf(it)) : ''}</td>
+<td>${crossBadge(it)}</td>
+<td class="c">${it.ex ? '<button class="mini b-rest">↩</button> <button class="mini dng b-del" title="Excluir definitivamente">🗑</button>' : '<button class="mini dng b-ex" title="Tirar do espelho">✕</button>'}</td></tr>`;
+}
+function renderHead() {
+  $('thead').innerHTML = '<tr>' + COLS.map(([k, t, c]) => `<th class="${c}" data-col="${k}">${t}${V.col === k ? (V.dir > 0 ? ' ▲' : ' ▼') : ''}</th>`).join('') + '</tr>';
+}
+function renderGroups() {
+  const sel = $('fGrp'), cur = sel.value, m = new Map();
+  S.items.filter(i => $('fEx').checked ? i.ex : !i.ex).forEach(i => { const g = i.group || '(Sem grupo)'; const o = m.get(g) || { t: 0, d: 0 }; o.t++; if (i.count != null) o.d++; m.set(g, o); });
+  sel.innerHTML = '<option value="">Todos os grupos</option>' + [...m.keys()].sort(coll.compare).map(g => `<option value="${esc(g)}">${esc(g)} (${m.get(g).d}/${m.get(g).t})</option>`).join('');
+  sel.value = m.has(cur) ? cur : '';
+}
+function renderSummary(view) {
+  const act = S.items.filter(i => !i.ex), done = act.filter(i => i.count != null).length;
+  let pos = 0, neg = 0, np = 0, nn = 0;
+  view.forEach(i => { const d = diffOf(i), v = impactOf(i); if (d > 0) { np++; pos += v || 0; } else if (d < 0) { nn++; neg += v || 0; } });
+  const pct = act.length ? Math.round(done / act.length * 100) : 0;
+  const tot = pos + neg;
+  let cxCard = '';
+  if (S.has.g && S.has.c) { let o = 0, d = 0, rs = 0; act.forEach(i => { if (crossResolved(i)) rs++; const c = crossInfo(i); if (c) { if (c.t === 'diff') d++; else o++; } }); cxCard = `<div class="card" style="border-color:${o + d ? '#f59e0b' : '#86efac'}"><small>Inconsistências entre os PDFs</small><b class="${o + d ? 'neg' : 'pos'}">${o + d}</b> <span class="hint">${o} só em um · ${d} saldo diferente${rs ? ' · ' + rs + ' resolvidas' : ''}</span></div>`; }
+  const ri = []; for (const [k, r] of Object.entries(S.rep || {})) ri.push((k === 'g' ? 'PDF por grupo' : k === 'c' ? 'PDF alfabético (custos)' : 'PDF') + ': ' + (r.stamp || 'importado') + ' · ' + r.read + ' lidos, ' + r.zero + ' zerados ignorados');
+  $('repinfo').textContent = ri.join('   |   ');
+  $('cards').innerHTML = `
+<div class="card"><small>Produtos no filtro</small><b>${view.length}</b> <span class="hint">de ${act.length}</span></div>
+<div class="card"><small>Conferidos (geral)</small><b>${done}/${act.length}</b> <span class="hint">${pct}%</span><div class="prog"><i style="width:${pct}%"></i></div></div>
+<div class="card"><small>Divergências no filtro</small><b class="pos">${np} ↑</b> &nbsp; <b class="neg">${nn} ↓</b></div>
+<div class="card"><small>Sobras (contagem &gt; ERP)</small><b class="pos">${fm(pos)}</b></div>
+<div class="card"><small>Faltas (contagem &lt; ERP)</small><b class="neg">${fm(neg)}</b></div>
+${cxCard}<div class="card" style="border-color:${tot < 0 ? '#fca5a5' : tot > 0 ? '#86efac' : 'var(--bd)'}"><small>Impacto financeiro total</small><b class="${tot > 0 ? 'pos' : tot < 0 ? 'neg' : ''}">${fm(tot)}</b></div>`;
+}
+function render() {
+  renderHead(); renderGroups(); syncGroupBtns();
+  const view = getView(), tb = $('tbody'); let h = '', last = null;
+  const showGH = !V.col && !filters().g;
+  for (const it of view) {
+    if (showGH && (it.group || '') !== last) { last = it.group || ''; if (last) h += `<tr class="gh"><td colspan="11">${esc(last)} <button class="mini dng b-gx" data-g="${esc(last)}" style="float:right">${$('fEx').checked ? '↩ restaurar grupo' : '✕ excluir grupo'}</button></td></tr>`; }
+    h += rowHTML(it);
+  }
+  tb.innerHTML = h || `<tr><td colspan="11" class="empty">${S.items.length ? 'Nenhum produto com esses filtros.' : 'Importe um PDF de estoque do ERP para começar (ou adicione produtos manualmente).'}</td></tr>`;
+  renderSummary(view); syncChkAll(view); setDirty(false);
+}
+function setDirty(d) { $('bRe').classList.toggle('dirty', d); }
+function refreshRow(tr, it) {
+  tr.className = rowClass(it);
+  tr.querySelector('.dcell').innerHTML = dCell(it);
+  tr.querySelector('.icell').textContent = it.count != null && it.price != null ? fm(impactOf(it)) : '';
+  tr.querySelector('.chk').checked = it.count != null;
+  renderSummary(getViewCached()); if (filtersActive()) setDirty(true);
+}
+let _vc = null;
+function getViewCached() { return getView(); }
+const itemOf = el => S.items.find(i => i.id === +el.closest('tr').dataset.id);
+
+/* ---------- eventos da tabela ---------- */
+$('thead').onclick = e => {
+  if (e.target.id === 'chkAll') { e.stopPropagation(); toggleAll(e.target); return; }
+  const th = e.target.closest('th'); if (!th || th.dataset.col === 'act') return;
+  const c = th.dataset.col;
+  if (V.col !== c) { V.col = c; V.dir = 1; } else if (V.dir === 1) V.dir = -1; else V.col = null;
+  render();
+};
+$('tbody').addEventListener('input', e => {
+  const t = e.target, it = itemOf(t); if (!it) return; const tr = t.closest('tr');
+  if (t.classList.contains('f-cnt')) { const raw = t.value.trim(); if (raw === '') it.count = null; else { const v = parseBR(raw); if (isNaN(v)) return; it.count = v; } }
+  else if (t.classList.contains('f-erp')) { const v = parseBR(t.value); if (isNaN(v)) return; it.erp = v; it.erpEdited = true; }
+  else if (t.classList.contains('f-pr')) { const raw = t.value.trim(); if (raw === '') it.price = null; else { const v = parseBR(raw); if (isNaN(v)) return; it.price = v; } }
+  else if (t.classList.contains('f-name')) it.name = t.value;
+  else if (t.classList.contains('f-code')) it.code = t.value.trim();
+  else return;
+  persist(); refreshRow(tr, it);
+});
+$('tbody').addEventListener('focusin', e => { if (e.target.classList.contains('f-cnt')) V.focusId = itemOf(e.target).id; });
+$('tbody').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList.contains('f-cnt')) {
+    let tr = e.target.closest('tr').nextElementSibling;
+    while (tr && !tr.querySelector('.f-cnt')) tr = tr.nextElementSibling;
+    if (tr) { const i = tr.querySelector('.f-cnt'); i.focus(); i.select(); }
+  }
+});
+$('tbody').addEventListener('change', e => {
+  if (!e.target.classList.contains('chk')) return;
+  const it = itemOf(e.target), tr = e.target.closest('tr');
+  if (e.target.checked) it.count = it.erp; else {
+    if (it.count != null && it.count !== it.erp && !confirm('Isso apaga a contagem digitada (' + fq(it.count) + '). Continuar?')) { e.target.checked = true; return; }
+    it.count = null;
+  }
+  tr.querySelector('.f-cnt').value = num2str(it.count); persist(); refreshRow(tr, it);
+});
+$('tbody').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.classList.contains('b-gx')) { excludeGroup(b.dataset.g, $('fEx').checked); return; }
+  const it = itemOf(b), tr = b.closest('tr');
+  if (b.classList.contains('b-eq')) { it.count = it.erp; tr.querySelector('.f-cnt').value = num2str(it.count); persist(); refreshRow(tr, it); }
+  else if (b.classList.contains('b-ack')) { const c = crossRaw(it); if (c) { it.ack = sigOf(c); it.noAuto = false; } persist(); render(); }
+  else if (b.classList.contains('b-unack')) { it.ack = null; it.noAuto = true; persist(); render(); }
+  else if (b.classList.contains('b-cv')) { await convModal(it, tr); }
+  else if (b.classList.contains('b-ex')) { it.ex = true; persist(); render(); toast('Produto retirado do espelho (veja em "Ver excluídos").'); }
+  else if (b.classList.contains('b-rest')) { it.ex = false; persist(); render(); }
+  else if (b.classList.contains('b-del')) { if (confirm('Excluir definitivamente "' + it.name + '"?\nEle não voltará em novas importações de PDF.')) { S.removed[keyOf(it)] = 1; S.items = S.items.filter(i => i !== it); persist(); render(); } }
+});
+['q', 'fGrp', 'fSt', 'fDv', 'fCx', 'fNeg', 'fEx'].forEach(id => $(id).addEventListener(id === 'q' ? 'input' : 'change', render));
+$('bRe').onclick = render;
+$('bFc').onclick = () => { $('q').value = ''; $('fGrp').value = ''; $('fSt').value = ''; $('fDv').value = ''; $('fCx').value = ''; $('fNeg').checked = false; $('fEx').checked = false; render(); };
+$('bRep').onclick = () => {
+  const v = getView().filter(i => i.count == null); if (!v.length) return toast('Nenhum produto não conferido nos filtros atuais.');
+  if (!confirm('Repetir o saldo do ERP como contagem em ' + v.length + ' produto(s) ainda não conferido(s)?')) return;
+  v.forEach(i => i.count = i.erp); persist(); render();
+};
+
+/* ---------- importação de PDF ---------- */
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+async function pdfRows(file) {
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise; const rows = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent();
+    rows.push(...buildRows(tc.items.map(i => ({ s: i.str, x: i.transform[4], y: i.transform[5], w: i.width }))));
+  }
+  return rows;
+}
+const TYPE_NAME = { g: 'Relatório por grupo (posição do estoque)', c: 'Relatório alfabético (custo de produtos)', x: 'Relatório (formato genérico)' };
+async function importFiles(files) {
+  const parsed = [];
+  for (const f of files) {
+    toast('Lendo ' + f.name + '…', 15000);
+    let rep;
+    try { rep = parseAny(await pdfRows(f)); } catch (err) { await modal(`<h3>Erro ao ler PDF</h3><p>${esc(f.name)}: ${esc(err.message)}</p>`, [{ t: 'OK', v: 1 }]); continue; }
+    if (!rep.items.length) { await modal(`<h3>Nenhum produto encontrado</h3><p>Não consegui identificar produtos em <b>${esc(f.name)}</b>. O PDF precisa ter texto (não imagem escaneada), com código - descrição e o saldo em cada linha.</p>`, [{ t: 'OK', v: 1 }]); continue; }
+    parsed.push({ f, rep });
+  }
+  $('toast').style.display = 'none';
+  if (!parsed.length) return;
+  parsed.sort((a, b) => (a.rep.type === 'g' ? 0 : 1) - (b.rep.type === 'g' ? 0 : 1));
+  let mode = 'all';
+  const prot = parsed.reduce((n, p) => n + countProtected(p.rep), 0);
+  if (prot) {
+    mode = await modal(`<h3>Atualizar saldos do ERP</h3><p>Há <b>${prot}</b> produto(s) deste(s) PDF(s) que você já conferiu ou cujo saldo do ERP você editou.</p><p>O que deseja atualizar?</p>
+<ul><li><b>Somente os não conferidos</b>: mantém intactos os já conferidos/editados (recomendado se o estoque mudou durante a contagem).</li><li><b>Todos</b>: substitui o saldo do ERP de todos; as contagens digitadas são mantidas, mas a diferença é recalculada.</li></ul>`,
+      [{ t: 'Cancelar', v: null }, { t: 'Somente os não conferidos', v: 'uncounted', cls: 'pri' }, { t: 'Todos os saldos', v: 'all' }]);
+    if (!mode) return;
+  }
+  autoAck();
+  let html = '';
+  for (const { f, rep } of parsed) {
+    const st = applyReport(rep, mode), considered = st.added + st.updated + st.kept;
+    if (rep.type === 'g' || rep.type === 'c') S.rep[rep.type] = { file: f.name, stamp: rep.stamp, read: st.read, zero: st.zeroIgnored };
+    const warn = (rep.pdfTotal != null && rep.pdfTotal !== rep.rowsRead) ? `<br><span class="neg">⚠ O PDF informa "Total listado: ${rep.pdfTotal}", mas li ${rep.rowsRead} produtos. Confira.</span>` : (rep.pdfTotal != null ? `<br><span class="hint">✔ Confere com o "Total listado: ${rep.pdfTotal}" do PDF.</span>` : '');
+    html += `<div class="sum"><b>${esc(f.name)}</b><br><span class="hint">${TYPE_NAME[rep.type]}${rep.stamp ? ' · gerado em ' + rep.stamp : ''}</span><br>
+Produtos lidos no PDF: <b>${st.read}</b><br>
+✔ Importados (saldo diferente de zero): <b>${considered}</b> <span class="hint">(${st.added} novos, ${st.updated} atualizados, ${st.kept} mantidos por já conferidos/editados)</span><br>
+⊘ Ignorados por saldo zerado: <b>${st.zeroIgnored}</b>${st.removed ? `<br>↷ Não reincluídos (você já removeu do espelho): <b>${st.removed}</b>` : ''}${st.hiddenNew ? `<br>↷ Novos em grupo que você excluiu (ficam fora): <b>${st.hiddenNew}</b>` : ''}${warn}</div>`;
+  }
+  persist(); render();
+  let cxN = 0, rsN = 0; const o = { 'only-g': 0, 'only-c': 0, diff: 0 };
+  if (S.has.g && S.has.c) S.items.forEach(i => { const c = crossInfo(i); if (c) { cxN++; o[c.t]++; } else if (crossResolved(i)) rsN++; });
+  const rsNote = rsN ? `<br><span class="hint">${rsN} inconsistência(s) já resolvida(s) antes (produto conferido, excluído ou marcado por você) não voltaram como pendentes.</span>` : '';
+  if (S.has.g && S.has.c) {
+    html += cxN ? `<div class="sum" style="border-color:#f59e0b"><b>⚠ Cruzamento dos dois PDFs: ${cxN} inconsistência(s) pendente(s)</b><ul><li>${o['only-g']} só no PDF por grupo</li><li>${o['only-c']} só no PDF alfabético</li><li>${o.diff} com saldo diferente entre os PDFs</li></ul>${rsNote}</div>`
+      : `<div class="sum" style="border-color:#86efac"><b>✔ Cruzamento dos dois PDFs:</b> nenhuma inconsistência pendente.${rsNote}</div>`;
+  } else if (parsed.length) html += `<p class="hint">Importe também o outro tipo de PDF para cruzar os dados e completar valor unitário, unidade e grupos.</p>`;
+  const r = await modal('<h3>Importação concluída</h3>' + html, cxN && S.has.g && S.has.c ? [{ t: 'Ver inconsistências', v: 'cx', cls: 'pri' }, { t: 'Fechar', v: 1 }] : [{ t: 'OK', v: 1, cls: 'pri' }]);
+  if (r === 'cx') { $('bFc').click(); $('fCx').value = 'any'; render(); }
+}
+$('fP').onchange = async e => { const f = [...e.target.files]; e.target.value = ''; await importFiles(f); };
+
+/* ---------- selecionar todos / excluir grupo ---------- */
+function syncChkAll(view) {
+  const c = $('chkAll'); if (!c) return;
+  const n = view.length, d = view.filter(i => i.count != null).length;
+  c.checked = n > 0 && d === n; c.indeterminate = d > 0 && d < n; c.disabled = n === 0 || $('fEx').checked;
+}
+function toggleAll(c) {
+  const view = getView(); if ($('fEx').checked || !view.length) { syncChkAll(view); return; }
+  const todo = view.filter(i => i.count == null);
+  if (todo.length) {
+    if (!confirm('Marcar ' + todo.length + ' produto(s) visível(is) como conferido(s), repetindo o saldo do ERP como contagem?')) { syncChkAll(view); return; }
+    todo.forEach(i => i.count = i.erp);
+  } else {
+    const same = view.filter(i => i.count === i.erp), keep = view.length - same.length;
+    if (!same.length) { toast('Todos os visíveis têm contagem digitada diferente do ERP; nada a desmarcar.'); syncChkAll(view); return; }
+    if (!confirm('Desmarcar ' + same.length + ' produto(s) conferido(s) que repetem o saldo do ERP?' + (keep ? '\n' + keep + ' com contagem digitada diferente do ERP serão mantidos.' : ''))) { syncChkAll(view); return; }
+    same.forEach(i => i.count = null);
+  }
+  persist(); render();
+}
+function syncGroupBtns() {
+  const g = $('fGrp').value, b = $('bGx'), ex = $('fEx').checked;
+  if (!g) b.style.display = 'none';
+  else { const n = S.items.filter(i => (i.group || '(Sem grupo)') === g && (ex ? i.ex : !i.ex)).length; b.style.display = ''; b.textContent = ex ? '↩ Restaurar grupo (' + n + ')' : '🗑 Excluir grupo (' + n + ')'; b.classList.toggle('dng', !ex); }
+  $('bXv').textContent = ex ? '↩ Restaurar visíveis' : '✕ Excluir visíveis'; $('bXv').classList.toggle('dng', !ex);
+}
+function excludeGroup(g, restore) {
+  const items = S.items.filter(i => (i.group || '(Sem grupo)') === g && (restore ? i.ex : !i.ex));
+  if (!items.length) return toast('Nenhum produto para ' + (restore ? 'restaurar' : 'excluir') + ' nesse grupo.');
+  if (restore) {
+    if (!confirm('Restaurar o grupo "' + g + '" (' + items.length + ' produto(s)) no espelho?')) return;
+    items.forEach(i => i.ex = false); delete S.exGroups[g];
+  } else {
+    const cnt = items.filter(i => i.count != null).length;
+    if (!confirm('Excluir o grupo "' + g + '" inteiro?\n' + items.length + ' produto(s) saem do espelho' + (cnt ? ', incluindo ' + cnt + ' já conferido(s) (a contagem fica guardada e volta se você restaurar)' : '') + '.\nEm novas importações, os produtos desse grupo continuarão fora.\nVocê pode restaurar em "Ver excluídos".')) return;
+    items.forEach(i => i.ex = true); S.exGroups[g] = 1;
+  }
+  persist(); render(); toast((restore ? 'Grupo restaurado: ' : 'Grupo excluído: ') + g + ' (' + items.length + ')');
+}
+$('bGx').onclick = () => excludeGroup($('fGrp').value, $('fEx').checked);
+$('bXv').onclick = () => {
+  const restore = $('fEx').checked, view = getView(); if (!view.length) return toast('Nenhum produto visível.');
+  const cnt = view.filter(i => i.count != null).length;
+  if (!confirm((restore ? 'Restaurar ' : 'Excluir ') + view.length + ' produto(s) visível(is)' + (!restore && cnt ? ' (' + cnt + ' já conferido(s))' : '') + '?' + (restore ? '' : '\nVocê pode restaurar em "Ver excluídos".'))) return;
+  view.forEach(i => i.ex = !restore); persist(); render(); toast(view.length + ' produto(s) ' + (restore ? 'restaurado(s).' : 'excluído(s).'));
+};
+
+/* ---------- conversão caixas -> unidades ---------- */
+async function convModal(it, tr) {
+  const guess = (it.name.match(/(?:CX|FRD|FD|FARD)\s*(\d+)/i) || [])[1];
+  const f0 = it.cv ? it.cv.f : '';
+  const un = it.unit || 'un';
+  const pr = modal(`<h3>📦 Converter caixas em unidades</h3><p class="hint">${esc(it.name)}</p>
+<div class="fld">Conversão: ${esc(un)} por caixa<input data-k="f" inputmode="decimal" value="${esc(num2str(f0))}" placeholder="ex.: 12"></div>
+${guess && !f0 ? `<div class="hint">Sugestão pelo nome: <a href="#" id="cvg">${guess} por caixa</a> (confira)</div>` : ''}
+<div class="fld">Quantidade de caixas<input data-k="c" inputmode="decimal" value="${it.cv ? esc(num2str(it.cv.c)) : ''}" placeholder="ex.: 3"></div>
+<div class="fld">Unidades soltas (opcional)<input data-k="s" inputmode="decimal" value="${it.cv && it.cv.s ? esc(num2str(it.cv.s)) : ''}" placeholder="ex.: 5"></div>
+<div class="sum" id="cvres" style="font-size:15px">Total: —</div>`,
+    [{ t: 'Cancelar', v: null }, { t: 'Somar ao que já contei', v: 'add' }, { t: 'Aplicar na contagem', v: 'set', cls: 'pri' }]);
+  const m = $('modal'), g = k => parseBR(m.querySelector(`[data-k="${k}"]`).value);
+  const tot = () => { const f = g('f'), c = g('c'), s0 = m.querySelector('[data-k="s"]').value.trim() === '' ? 0 : g('s'); return (isNaN(f) || isNaN(c) || isNaN(s0)) ? NaN : +(c * f + s0).toFixed(6); };
+  const upd = () => { const t = tot(); $('cvres').innerHTML = isNaN(t) ? 'Total: —' : `${fq(g('c'))} × ${fq(g('f'))}${m.querySelector('[data-k="s"]').value.trim() ? ' + ' + fq(g('s')) : ''} = <b>${fq(t)} ${esc(un)}</b>`; };
+  m.querySelectorAll('input[data-k]').forEach(i => { i.addEventListener('input', upd); i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); m.querySelector('.acts .pri').click(); } }); });
+  const cvg = $('cvg'); if (cvg) cvg.onclick = e => { e.preventDefault(); m.querySelector('[data-k="f"]').value = guess; upd(); m.querySelector('[data-k="c"]').focus(); };
+  upd(); setTimeout(() => m.querySelector(f0 ? '[data-k="c"]' : '[data-k="f"]').focus(), 30);
+  const r = await pr; if (!r) return;
+  const t = tot(); if (isNaN(t)) return toast('Informe a conversão e a quantidade de caixas.');
+  const s0 = m.querySelector('[data-k="s"]').value.trim() === '' ? 0 : g('s');
+  it.cv = { f: g('f'), c: g('c'), s: s0 };
+  it.count = r === 'add' ? +((it.count || 0) + t).toFixed(6) : t;
+  tr.querySelector('.f-cnt').value = num2str(it.count); persist(); refreshRow(tr, it);
+  toast(`Contagem de "${it.name}": ${fq(it.count)}`);
+}
+
+/* ---------- adicionar produto ---------- */
+$('bAdd').onclick = async () => {
+  const r = await modal(`<h3>Adicionar produto</h3>
+<div class="fld">Código<input data-k="code"></div><div class="fld">Descrição *<input data-k="name"></div>
+<div class="fld">Grupo<input data-k="group" list="dg"></div><datalist id="dg">${[...new Set(S.items.map(i => i.group).filter(Boolean))].map(g => `<option value="${esc(g)}">`).join('')}</datalist>
+<div class="fld">Saldo no ERP<input data-k="erp" inputmode="decimal" value="0"></div><div class="fld">Valor unitário<input data-k="price" inputmode="decimal"></div>`,
+    [{ t: 'Cancelar', v: null }, { t: 'Adicionar', v: 'FORM', cls: 'pri' }]);
+  if (!r || !r.name.trim()) return;
+  const erp = parseBR(r.erp), price = parseBR(r.price);
+  S.items.push({ id: S.seq++, code: r.code.trim(), name: r.name.trim(), group: r.group.trim(), erp: isNaN(erp) ? 0 : erp, price: isNaN(price) ? null : price, count: null, ex: false, manual: true, sg: null, sc: null });
+  persist(); render(); toast('Produto adicionado.');
+};
+
+/* ---------- calculadora ---------- */
+const KEYS = ['C', '⌫', '(', ')', '7', '8', '9', '÷', '4', '5', '6', '×', '1', '2', '3', '−', '0', ',', '%', '+'];
+$('ckeys').innerHTML = KEYS.map(k => `<button data-k="${k}">${k}</button>`).join('') + '<button data-k="=" class="pri" style="grid-column:span 4">=</button>';
+function calcPreview() { const v = evalExpr($('cexp').value); $('cres').textContent = isNaN(v) ? ($('cexp').value ? '…' : '0') : nf.format(v); return v; }
+function calcEnter() {
+  const exp = $('cexp').value.trim(); if (!exp) return; const v = evalExpr(exp);
+  if (isNaN(v)) return toast('Expressão inválida.');
+  S.calc.unshift({ e: exp, r: +v.toFixed(6) }); S.calc = S.calc.slice(0, 100); persist(); renderHist();
+  $('cexp').value = num2str(+v.toFixed(6)); calcPreview();
+}
+function renderHist() {
+  $('chist').innerHTML = S.calc.length ? S.calc.map((h, i) => `<div data-i="${i}"><span>${esc(h.e)}</span><b>= ${nf.format(h.r)}</b></div>`).join('') : '<div class="hint">Sem histórico ainda.</div>';
+}
+$('ckeys').onclick = e => {
+  const k = e.target.dataset.k; if (!k) return; const x = $('cexp');
+  if (k === 'C') x.value = ''; else if (k === '⌫') x.value = x.value.slice(0, -1); else if (k === '=') return calcEnter(); else x.value += k;
+  calcPreview(); x.focus();
+};
+$('cexp').addEventListener('input', calcPreview);
+$('cexp').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); calcEnter(); } });
+$('chist').onclick = e => { const d = e.target.closest('div[data-i]'); if (!d) return; const h = S.calc[+d.dataset.i]; $('cexp').value = h.e; calcPreview(); $('cexp').focus(); };
+$('cClr').onclick = () => { S.calc = []; persist(); renderHist(); };
+$('cX').onclick = () => $('calc').classList.remove('on');
+$('bCalc').onclick = () => { $('calc').classList.toggle('on'); if ($('calc').classList.contains('on')) $('cexp').focus(); };
+$('cIns').onclick = () => {
+  let v = evalExpr($('cexp').value); if (isNaN(v) && S.calc.length) v = S.calc[0].r;
+  if (isNaN(v)) return toast('Calcule um valor primeiro.');
+  const it = S.items.find(i => i.id === V.focusId); if (!it) return toast('Clique antes no campo "Qtd conferência" do produto.');
+  it.count = +v.toFixed(6); persist(); render(); toast('Inserido em: ' + it.name);
+};
+
+/* ---------- exportações ---------- */
+function exportRows(all) { return getView(all); }
+function filterDesc(all) {
+  if (all) return 'Completo';
+  const f = filters(), p = [];
+  if (f.q) p.push('busca "' + $('q').value + '"'); if (f.g) p.push('grupo ' + f.g);
+  if (f.st) p.push($('fSt').selectedOptions[0].text); if (f.dv) p.push($('fDv').selectedOptions[0].text);
+  if (f.neg) p.push('ERP negativo'); if (f.ex) p.push('excluídos');
+  return p.length ? p.join(' | ') : 'Sem filtros';
+}
+const stamp = () => new Date().toISOString().slice(0, 10);
+const qfmt = v => (v === '' || v == null || isNaN(v)) ? 'General' : (Number.isInteger(v) ? '#,##0' : '#,##0.###');
+function exportXLSX(all) {
+  if (!window.XLSX) return toast('Biblioteca de Excel não carregou (verifique a internet).');
+  const rows = exportRows(all); if (!rows.length) return toast('Nada para exportar.');
+  const head = ['Código', 'Produto', 'Grupo', 'Qtd no ERP', 'Valor unitário', 'Qtd conferência', 'Diferença', 'Impacto (R$)', 'Status', 'Cruzamento PDFs'];
+  const aoa = [head];
+  rows.forEach(i => aoa.push([i.code || '', i.name, i.group || '', i.erp, i.price == null ? '' : i.price, i.count == null ? '' : i.count, '', '', i.count == null ? 'A contar' : (diffOf(i) === 0 ? 'OK' : 'Divergente'), crossText(i)]));
+  const n = rows.length + 1; aoa.push(['', 'TOTAL', '', '', '', '', '', '', '', '']);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  rows.forEach((i, k) => {
+    const r = k + 2, d = diffOf(i), im = impactOf(i);
+    ws['G' + r] = { t: 'n', f: `IF(F${r}="","",F${r}-D${r})`, v: d == null ? '' : d, z: qfmt(d) };
+    ws['H' + r] = { t: 'n', f: `IF(OR(G${r}="",E${r}=""),"",G${r}*E${r})`, v: im == null ? '' : im, z: '"R$" #,##0.00' };
+    ws['D' + r].z = qfmt(i.erp); if (ws['E' + r] && ws['E' + r].t === 'n') ws['E' + r].z = '"R$" #,##0.00'; if (ws['F' + r] && ws['F' + r].t === 'n') ws['F' + r].z = qfmt(i.count);
+  });
+  const tot = rows.reduce((s, i) => s + (impactOf(i) || 0), 0);
+  ws['H' + (n + 1)] = { t: 'n', f: `SUM(H2:H${n})`, v: +tot.toFixed(2), z: '"R$" #,##0.00' };
+  ws['!cols'] = [{ wch: 10 }, { wch: 46 }, { wch: 22 }, { wch: 12 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 34 }];
+  ws['!autofilter'] = { ref: `A1:J${n}` }; ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Contagem');
+  XLSX.writeFile(wb, `contagem_estoque_${stamp()}.xlsx`); toast('Excel exportado (' + rows.length + ' itens).');
+}
+function exportPDF(all, qtyOnly) {
+  if (!window.jspdf) return toast('Biblioteca de PDF não carregou (verifique a internet).');
+  const rows = exportRows(all); if (!rows.length) return toast('Nada para exportar.');
+  const doc = new jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+  doc.setFontSize(14); doc.text('Contagem física de estoque' + (qtyOnly ? ' — quantidades' : ''), 30, 30);
+  doc.setFontSize(9); doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}  •  ${filterDesc(all)}  •  ${rows.length} itens`, 30, 44);
+  let pos = 0, neg = 0; rows.forEach(i => { const v = impactOf(i) || 0; if (v > 0) pos += v; else neg += v; });
+  const sgn = d => d == null ? '' : (d > 0 ? '+' : '') + fq(d);
+  const head = qtyOnly ? ['Código', 'Produto', 'Grupo', 'Qtd ERP', 'Qtd conferência', 'Diferença'] : ['Código', 'Produto', 'Grupo', 'Qtd ERP', 'Valor unit.', 'Qtd conferência', 'Diferença', 'Impacto'];
+  const body = rows.map(i => { const d = diffOf(i);
+    return qtyOnly ? [i.code || '', i.name, i.group || '', fq(i.erp), i.count == null ? '' : fq(i.count), sgn(d)]
+      : [i.code || '', i.name, i.group || '', fq(i.erp), i.price == null ? '' : fm(i.price), i.count == null ? '' : fq(i.count), sgn(d), impactOf(i) == null ? '' : fm(impactOf(i))]; });
+  const right = qtyOnly ? { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' } } : { 3: { halign: 'right' }, 4: { halign: 'right' }, 5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' } };
+  const cfg = {
+    startY: 54, head: [head], body,
+    styles: { fontSize: 8, cellPadding: 3 }, headStyles: { fillColor: [29, 78, 216] }, footStyles: { fillColor: [238, 242, 247], textColor: 20, fontStyle: 'bold' },
+    columnStyles: right, showFoot: 'lastPage',
+    didParseCell: d => { if (d.section === 'body') { const i = rows[d.row.index], df = diffOf(i); if (df > 0) { d.cell.styles.fillColor = [220, 252, 231]; } else if (df < 0) { d.cell.styles.fillColor = [254, 226, 226]; } } }
+  };
+  if (!qtyOnly) cfg.foot = [['', '', '', '', '', '', 'Sobras', fm(pos)], ['', '', '', '', '', '', 'Faltas', fm(neg)], ['', '', '', '', '', '', 'Impacto total', fm(pos + neg)]];
+  doc.autoTable(cfg);
+  const pc = doc.internal.getNumberOfPages(); for (let p = 1; p <= pc; p++) { doc.setPage(p); doc.setFontSize(8); doc.text(`Página ${p}/${pc}`, 790, 580, { align: 'right' }); }
+  doc.save(`contagem_estoque${qtyOnly ? '_quantidades' : ''}_${stamp()}.pdf`); toast('PDF exportado (' + rows.length + ' itens' + (qtyOnly ? ', só quantidades' : '') + ').');
+}
+
+/* ---------- menus, backup, limpar ---------- */
+document.querySelectorAll('.menu > button').forEach(b => b.onclick = e => { e.stopPropagation(); const m = b.parentElement, o = m.classList.contains('open'); document.querySelectorAll('.menu').forEach(x => x.classList.remove('open')); if (!o) m.classList.add('open'); });
+document.addEventListener('click', () => document.querySelectorAll('.menu').forEach(x => x.classList.remove('open')));
+document.querySelectorAll('.dd button').forEach(b => b.onclick = () => {
+  const x = b.dataset.x;
+  if (x === 'xlsx-f') exportXLSX(false); else if (x === 'xlsx-a') exportXLSX(true);
+  else if (x === 'pdf-f') exportPDF(false, false); else if (x === 'pdf-fq') exportPDF(false, true); else if (x === 'pdf-a') exportPDF(true, false); else if (x === 'pdf-aq') exportPDF(true, true);
+  else if (x === 'bk-out') { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], { type: 'application/json' })); a.download = `backup_contagem_${stamp()}.json`; a.click(); }
+  else if (x === 'bk-in') $('fB').click();
+});
+$('fB').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try { const o = JSON.parse(await f.text()); if (!Array.isArray(o.items)) throw 0; if (!confirm('Substituir a contagem atual pelo backup (' + o.items.length + ' itens)?')) return; S = normState(o); persist(); render(); renderHist(); toast('Backup restaurado.'); }
+  catch (er) { toast('Arquivo de backup inválido.'); }
+};
+$('bClear').onclick = async () => {
+  const r = await modal(`<h3>Limpar tudo?</h3><p>Isso apaga <b>todos os produtos, contagens e o histórico da calculadora</b> deste navegador. Não dá para desfazer (dica: baixe um backup antes).</p>`, [{ t: 'Cancelar', v: false }, { t: 'Sim, limpar tudo', v: true, cls: 'dng' }]);
+  if (!r) return; S = NEWS(); V.col = null; V.focusId = null; persist(); $('bFc').click(); renderHist(); toast('Tudo limpo.');
+};
+$('mask').addEventListener('mousedown', e => { if (e.target === $('mask') && $('modal').querySelector('.acts button')) $('modal').querySelector('.acts button').click(); });
+
+/* ---------- início ---------- */
+load(); render(); renderHist(); calcPreview();
+if (S.items.length) $('saved').textContent = '· contagem anterior restaurada';
+</script>
+</body>
+</html>
